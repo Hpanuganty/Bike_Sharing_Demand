@@ -1,0 +1,145 @@
+---
+title: "Bike_Sharing_Demand"
+author: "Harika Panuganty"
+date: "4/3/2021"
+output: html_document
+---
+
+Introduction
+This dataset is publicly available on Kaggle (https://www.kaggle.com/c/bike-sharing-demand/data) and records bike usage in different datafields including seasons, weather, temperature, windspeed, humidity and more. This particular bike sharing program involves obtaining membership, rental and returns through a network of kiosk locations which can aid in understanding the mobility of the a city. 
+
+The goal of this project is to forecast bike rental demand at the Capital bikshare program in Washington DC, using hourly bike rentals over the past two years.  
+
+Variables: 
+This dataset consists of 12 data fields; we will use the first 11 variables in our model to predict the 12, number of total rentals: 
+1. datetime - hourly date + timestamp      
+2. season - 1 = spring, 2 = summer, 3 = fall, 4 = winter      
+3. holiday - whether the day is considered a holiday     
+4. workingday - whether the day is neither a weekend nor holiday     
+5. weather - 1: Clear, Few clouds, Partly cloudy, Partly cloudy , 2: Mist + Cloudy, Mist + Broken clouds, Mist + Few clouds, Mist , 3: Light Snow, Light Rain + Thunderstorm + Scattered clouds, Light Rain + Scattered clouds , 4: Heavy Rain + Ice Pallets + Thunderstorm + Mist, Snow + Fog        
+6. temp - temperature in Celsius         
+7. atemp - "feels like" temperature in Celsius       
+8. humidity - relative humidity        
+9. windspeed - wind speed
+10. casual - number of non-registered user rentals initiated        
+11. registered - number of registered user rentals initiated      
+12. count - number of total rentals
+
+Data pre-processing: Process the 'year' variable and remove all observations with weather == 4 (these are outliers and will be removed)
+```{r, echo = FALSE, message = FALSE, warning=FALSE}
+# set up
+rm(list=ls())
+library(plyr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+
+# Read the dataset in
+bike_data <- read.csv("~/Desktop/bike_data.csv", header = TRUE)
+
+# Preprocess year variable
+bike_data <- bike_data %>% mutate(datetime_f = mdy_hm(datetime)) %>%
+  mutate(year = as.factor(year(datetime_f))) %>%
+  mutate(weather = as.factor(weather)) %>%
+  filter(weather != "4")
+```
+
+
+Performing simple linear regression: count ~ temperature and calculating their coefficients + 95% CI    
+```{r}
+## Insert code below
+bike_data_lm <- lm(count ~ temp, data=bike_data)
+#summary(bike_data_lm)
+
+coef(bike_data_lm)
+confint(bike_data_lm)
+
+```
+
+Understanding and interpreting the results: Count is the total number of bike rentals and is a whole number. If the temperature is 0 degrees celsius, there are 6 bike rentals (coefficient of intercept), and when the temperature increases by 1 degree celsius, 9 more bikes are rented (temp). The direction of the association between temp and count is positive (increasing). The magnitude of the association between temp and count is 9.17 (coefficient of temp). 
+
+Performing regression count ~ temp_f (where temp_f is Farenheit representation of values in the temp variable)
+```{r}
+## Insert code below
+convert_celsuis_to_fahr <- function(temperature) {
+  fahr <- ((temperature * 9/5) + 32)
+  return(fahr)
+}
+
+bike_data <- mutate (bike_data, temp_f = convert_celsuis_to_fahr(bike_data$temp))
+
+bike_data_lm_tempf <- lm(count ~ temp_f, data=bike_data)
+coef(bike_data_lm_tempf)
+confint(bike_data_lm_tempf)
+
+```
+
+If the temperature is 0 degrees celsius, -157 bikes were rented (coefficient of intercept). When the temperature increases by 1 degree celsius, 5 more bikes were rented. The direction of the association between count and temp_f is positive (increasing). The magnitude of association between count and temp_f is 5.09 (coefficient of temp_f).
+
+Performing multiple linear regression on the same bike rental dataset; count ~ temp + season + humidity + weather + year. We'd like to keep season and weather as categorical variables so will use mutate function to convert from numeric to factor.
+```{r}
+## Insert code below
+bike_data <- bike_data %>% mutate(season = as.factor(season))
+bike_data <- bike_data %>% mutate(weather = as.factor(weather))
+bike_data_mr_lm <- lm(count ~ temp + season + humidity + weather + year, data = bike_data)
+
+summary(bike_data_mr_lm)
+
+coef(bike_data_mr_lm)
+confint(bike_data_mr_lm)
+```
+Understanding and interpreting the intercept: The intercept is 98. When the temperature is 0 degrees celsius, the season=1 (spring), humidity is relative, weather=1 (clear, few clouds, partly cloudy) and the year = 2011, the total number of bike rentals is 98. 
+
+How each variable contributes to count (observing the value of each variable's coefficient and the positive/negative sign in front of the number)
+     Temp - If temperature increases by 1 degree celsius, the number of bike rentals increases by      10 (10.43)
+     
+     Season2 Summer - In the summer, the number of bike rentals increases by 5 (4.7).
+     
+     Season3 Fall - In the fall, the number of bike rentals decreases by 29 (-29.1). 
+     
+     Season4 Winter - In the winter, the number of bike rentals increases by 67 (66.9).
+     
+     Humidity - When there is relative humidity, the number of bike rentals decreases by 3     
+                (-2.7).
+                
+     Weather2 - When the weather is mist + cloudy, mist + broken clouds, mist + few clouds, mist the number of bike rentals increases by 11 (11.3). 
+     
+     Weather3 - When the weather is light snow, light rain + thunderstroms + scattered clouds,  
+     light + scattered clouds, the number of bike rentals decreases by 7 (7.3)
+     
+     Year2012 - In the year 2012, compared to 2011, the number of bike rentals increased by 76 
+     (75.8). 
+
+Understanding the quality of fit or the P-value (P-value < 0.001 to reject any null hypothesis)
+
+    Quality of fit: The RSE for the data is very high (it should be low), 149.6 on 10876 degrees of freedom. The R^2 statistic is very low at 0.3 (it      should be high). The data points are far and scattered, indicating a poor quality of fit. 
+
+      Temp - The 95% CI (9.8,11.0) and the p-value < 0 (2e-16). The p-value is significant and there is an association based on the 95%       CI so we reject the null hypothesis.
+      
+      Season2 (Summer) - The 95% CI is (-5.55,14.98) and the p-value > 0 (0.367). The p-value is
+      not significant and there is no association based on the 95% CI so we do not reject the
+      null hypothesis.
+      
+      Season3 (Fall) - The 95% CI is (16.06, 42.13) (switched positions since both were negative)
+      and the p-value < 0 (1.21e-05). The p-value is significant and there is an association    
+      based on the 95% CI so we reject the null hypothesis. 
+
+      Season4 (Winter) - The 95% CI is (58.37, 75.5) and the p-value < 0 (2e-16). The p-value is significant and there is an association based on the 95% CI so we reject the null     
+      hypothesis.
+      
+      Humidity (Relative) - The 95% CI is  (2.56, 2.9) (switched positions since both were 
+      negative) and the p-value < 0 (2e-16). The p-value is significant and there is an 
+      association based on the 95% CI so we reject the null hypothesis.
+      
+      Weather2 (Mist+cloudy, mist+broken clouds, mist+few clouds, mist) - The 95% CI is 
+      (11.34,3.48) and the p-value < 0 (0.00115). The p-value is significant (depending on the 
+      data) and there is an association based on the 95% CI so we reject the null hypothesis.
+      
+      Weather3 (Light snow, light rain+thunderstorm+scattered clouds, light rain+scattered   
+      clouds) - The 95% CI is (-7.37,5.78) and the p-value > 0 (0.202). The p-value is not      
+      significant and there is not an association based on the 95% CI so we do not reject the 
+      null hypothesis.
+      
+      Year2012 - The 95% CI is (70.21,81.54) and the p-value < 0 (2e-16). The p-value is       
+      significant and there is an association based on the 95% CI so we reject the null     
+      hypothesis.
