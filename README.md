@@ -1,5 +1,5 @@
 # Bike_Sharing_Demand
-### Simple and multiple linear regression to forecast bike rentals using hourly rental data of the past two years 
+### Simple and multiple linear regression models to forecast bike rentals using hourly rental data of the past two years 
 
 This dataset from [Kaggle](https://www.kaggle.com/c/bike-sharing-demand/data) records bike rental data in different conditions including seasons, weather, temperature, windspeed and humidity. This particular bike sharing program involves obtaining membership, rental and returns through a network of kiosk locations which can aid in understanding the mobility of the a city.
 
